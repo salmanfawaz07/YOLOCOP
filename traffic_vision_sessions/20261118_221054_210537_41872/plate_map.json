@@ -1,0 +1,77 @@
+[
+  {
+    "image": "plate_f000150_v380_1.jpg",
+    "vehicle_id": "380",
+    "frame": 150
+  },
+  {
+    "image": "plate_f000165_v380_2.jpg",
+    "vehicle_id": "380",
+    "frame": 165
+  },
+  {
+    "image": "plate_f000180_v380_3.jpg",
+    "vehicle_id": "380",
+    "frame": 180
+  },
+  {
+    "image": "plate_f000270_v388_4.jpg",
+    "vehicle_id": "388",
+    "frame": 270
+  },
+  {
+    "image": "plate_f000285_vUnmatched-f285-d1_5.jpg",
+    "vehicle_id": "Unmatched-f285-d1",
+    "frame": 285
+  },
+  {
+    "image": "plate_f000330_vUnmatched-f330-d1_6.jpg",
+    "vehicle_id": "Unmatched-f330-d1",
+    "frame": 330
+  },
+  {
+    "image": "plate_f000465_v405_7.jpg",
+    "vehicle_id": "405",
+    "frame": 465
+  },
+  {
+    "image": "plate_f000495_v405_8.jpg",
+    "vehicle_id": "405",
+    "frame": 495
+  },
+  {
+    "image": "plate_f000555_vUnmatched-f555-d1_9.jpg",
+    "vehicle_id": "Unmatched-f555-d1",
+    "frame": 555
+  },
+  {
+    "image": "plate_f000570_vUnmatched-f570-d3_10.jpg",
+    "vehicle_id": "Unmatched-f570-d3",
+    "frame": 570
+  },
+  {
+    "image": "plate_f000600_v434_11.jpg",
+    "vehicle_id": "434",
+    "frame": 600
+  },
+  {
+    "image": "plate_f000615_v434_12.jpg",
+    "vehicle_id": "434",
+    "frame": 615
+  },
+  {
+    "image": "plate_f000690_vUnmatched-f690-d2_13.jpg",
+    "vehicle_id": "Unmatched-f690-d2",
+    "frame": 690
+  },
+  {
+    "image": "plate_f000720_vUnmatched-f720-d1_14.jpg",
+    "vehicle_id": "Unmatched-f720-d1",
+    "frame": 720
+  },
+  {
+    "image": "plate_f000735_vUnmatched-f735-d1_15.jpg",
+    "vehicle_id": "Unmatched-f735-d1",
+    "frame": 735
+  }
+]

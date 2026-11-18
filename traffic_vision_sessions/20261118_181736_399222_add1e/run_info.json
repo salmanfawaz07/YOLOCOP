@@ -1,0 +1,9 @@
+{
+  "input_file": "indian_traffic.mp4",
+  "media_type": "video",
+  "processed_frames": 969,
+  "detection_count": 1185,
+  "plate_crop_count": 0,
+  "ocr_reading_count": 0,
+  "completed_at": "2026-11-18T18:21:47.855863"
+}

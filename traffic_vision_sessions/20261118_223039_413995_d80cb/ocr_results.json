@@ -1,0 +1,77 @@
+[
+  {
+    "image": "plate_f000150_v574_1.jpg",
+    "prediction": "MH03CPA51",
+    "confidence": 0.3131
+  },
+  {
+    "image": "plate_f000165_v574_2.jpg",
+    "prediction": "H42KA356",
+    "confidence": 0.2988
+  },
+  {
+    "image": "plate_f000180_v574_3.jpg",
+    "prediction": "MH04FH354",
+    "confidence": 0.5313
+  },
+  {
+    "image": "plate_f000270_v582_4.jpg",
+    "prediction": "AHH53",
+    "confidence": 0.2643
+  },
+  {
+    "image": "plate_f000285_vUnmatched-f285-d1_5.jpg",
+    "prediction": "MP04OP304",
+    "confidence": 0.9284
+  },
+  {
+    "image": "plate_f000330_vUnmatched-f330-d1_6.jpg",
+    "prediction": "MH4MH0472",
+    "confidence": 0.5552
+  },
+  {
+    "image": "plate_f000465_v599_7.jpg",
+    "prediction": "MP09WF8336",
+    "confidence": 0.9919
+  },
+  {
+    "image": "plate_f000495_v599_8.jpg",
+    "prediction": "MP09WF833HP6",
+    "confidence": 0.797
+  },
+  {
+    "image": "plate_f000555_vUnmatched-f555-d1_9.jpg",
+    "prediction": "MP37T2",
+    "confidence": 0.8763
+  },
+  {
+    "image": "plate_f000570_vUnmatched-f570-d3_10.jpg",
+    "prediction": "MP37MT25",
+    "confidence": 0.8898
+  },
+  {
+    "image": "plate_f000600_v628_11.jpg",
+    "prediction": "K50859",
+    "confidence": 0.6625
+  },
+  {
+    "image": "plate_f000615_v628_12.jpg",
+    "prediction": "MH82",
+    "confidence": 0.2421
+  },
+  {
+    "image": "plate_f000690_vUnmatched-f690-d2_13.jpg",
+    "prediction": "KN2ALE",
+    "confidence": 0.4113
+  },
+  {
+    "image": "plate_f000720_vUnmatched-f720-d1_14.jpg",
+    "prediction": "R4B09",
+    "confidence": 0.8283
+  },
+  {
+    "image": "plate_f000735_vUnmatched-f735-d1_15.jpg",
+    "prediction": "4AB05",
+    "confidence": 0.7601
+  }
+]
