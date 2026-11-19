@@ -1286,7 +1286,7 @@ def run_pipeline(media_path, is_image, confidence, file_name, status_box):
 
     raw_ocr_results, ocr_error = [], None
 
-    if plate_map:
+    if plate_map and is_image:
         status_box.info(
             f"YOLO complete. {len(plate_map)} plate crops found. Running Awiros OCR..."
         )
@@ -1301,6 +1301,14 @@ def run_pipeline(media_path, is_image, confidence, file_name, status_box):
             subprocess.SubprocessError,
         ) as error:
             ocr_error = str(error)
+
+    elif plate_map:
+        status_box.warning(
+            f"YOLO complete. {len(plate_map)} plate crops saved. "
+            "Video OCR temporarily skipped for testing."
+
+    )
+
     else:
         status_box.warning(
             "No number-plate boxes were detected by YOLO, so OCR was skipped."
