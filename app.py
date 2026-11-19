@@ -900,7 +900,7 @@ def run_awiros_ocr(plate_directory, output_json):
         "--dict_path", str(OCR_DICT),
         "--device", "cpu",
         "--output_json", str(output_json),
-        "--paddleocr_dir", str(PADDLEOCR_DIR)
+        "--paddleocr_dir", ""
     ]
 
     result = subprocess.run(
