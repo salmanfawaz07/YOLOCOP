@@ -17,7 +17,19 @@ from huggingface_hub import hf_hub_download
 # YOLOCOP - AI Traffic Violation Detection System
 # YOLOv8 + ByteTrack + Awiros ANPR
 # ==========================================================
+# Initialize Streamlit session state
+SESSION_DEFAULTS = {
+    "img_token": None,
+    "vid_token": None,
+    "active_kind": "image",
+    "upload_token": None,
+    "media_path": None,
+    "last_run": None,
+}
 
+for key, default_value in SESSION_DEFAULTS.items():
+    if key not in st.session_state:
+        st.session_state[key] = default_value
 BASE = Path(__file__).resolve().parent
 
 MODEL_PATH = (
@@ -29,7 +41,6 @@ ENGINE_DIR = BASE / "lpr_engine" / "awiros_anpr"
 OCR_SCRIPT = ENGINE_DIR / "test.py"
 OCR_DICT = ENGINE_DIR / "en_dict.txt"
 PADDLEOCR_DIR = ENGINE_DIR / "PaddleOCR"
-
 HF_REPO_ID = "MohammedSalmanFawaz/yolocop-awiros-ocr"
 PLATE_DETECTION_CONFIDENCE = 0.03
 PLATE_SCAN_INTERVAL = 5
@@ -1368,7 +1379,19 @@ st.markdown(f"""
 # ==========================================================
 # TRAFFIC VIOLATION DETECTION  (upload + start)
 # ==========================================================
+# Initialize Streamlit session state
+SESSION_DEFAULTS = {
+    "img_token": None,
+    "vid_token": None,
+    "active_kind": "image",
+    "upload_token": None,
+    "media_path": None,
+    "last_run": None,
+}
 
+for key, default_value in SESSION_DEFAULTS.items():
+    if key not in st.session_state:
+        st.session_state[key] = default_value
 st.markdown(
     '<div class="h-title">Traffic Violation Detection</div>'
     '<div class="h-sub">Upload an image or video and start AI detection.</div>',
