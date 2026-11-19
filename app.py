@@ -883,12 +883,9 @@ def run_awiros_ocr(plate_directory, output_json):
         raise FileNotFoundError(
             f"OCR dictionary not found: {OCR_DICT}"
         )
-
-    if not (PADDLEOCR_DIR / "ppocr" / "__init__.py").exists():
-        raise FileNotFoundError(
-            f"PaddleOCR repository not found: {PADDLEOCR_DIR}"
-        )
-
+        
+    "--paddleocr_dir", ""
+    
     # Download model from Hugging Face
     ocr_weights = download_ocr_weights()
 
