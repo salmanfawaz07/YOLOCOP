@@ -31,7 +31,9 @@ for key, default_value in SESSION_DEFAULTS.items():
     if key not in st.session_state:
         st.session_state[key] = default_value
 BASE = Path(__file__).resolve().parent
-
+# Upload directory
+WORK_DIR = BASE / "uploads"
+WORK_DIR.mkdir(parents=True, exist_ok=True)
 MODEL_PATH = (
     BASE / "runs" / "detect" / "outputs"
     / "traffic_violation_v1" / "weights" / "best.pt"
