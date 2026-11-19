@@ -12,7 +12,7 @@ from datetime import datetime
 from collections import defaultdict, Counter
 from ultralytics import YOLO
 import sys
-from huggingface_hub import hf_hub_download
+import huggingface_hub
 # ==========================================================
 # YOLOCOP - AI Traffic Violation Detection System
 # YOLOv8 + ByteTrack + Awiros ANPR
@@ -436,7 +436,7 @@ def save_crop(image, path, verify=False):
 
 def download_ocr_weights():
     try:
-        model_path = hf_hub_download(
+        model_path = huggingface_hub.hf_hub_download(
             repo_id=HF_REPO_ID,
             filename="model.safetensors"
         )
@@ -853,7 +853,7 @@ def process_video(model, video_path, output_dir, confidence, progress):
 def download_ocr_weights():
     try:
         return Path(
-            hf_hub_download(
+            huggingface_hub.hf_hub_download(
                 repo_id=HF_REPO_ID,
                 filename="model.safetensors"
             )
