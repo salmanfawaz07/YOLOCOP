@@ -11,7 +11,8 @@ from pathlib import Path
 from datetime import datetime
 from collections import defaultdict, Counter
 from ultralytics import YOLO
-
+import sys
+from huggingface_hub import hf_hub_download
 # ==========================================================
 # YOLOCOP - AI Traffic Violation Detection System
 # YOLOv8 + ByteTrack + Awiros ANPR
@@ -23,45 +24,30 @@ MODEL_PATH = (
     BASE / "runs" / "detect" / "outputs"
     / "traffic_violation_v1" / "weights" / "best.pt"
 )
-
 ENGINE_DIR = BASE / "lpr_engine" / "awiros_anpr"
+
 OCR_SCRIPT = ENGINE_DIR / "test.py"
-OCR_WEIGHTS = ENGINE_DIR / "model.safetensors"
 OCR_DICT = ENGINE_DIR / "en_dict.txt"
 PADDLEOCR_DIR = ENGINE_DIR / "PaddleOCR"
-PLATE_DETECTION_CONFIDENCE = 0.03
-PLATE_SCAN_INTERVAL = 15
 
+HF_REPO_ID = "MohammedSalmanFawaz/yolocop-awiros-ocr"
+PLATE_DETECTION_CONFIDENCE = 0.03
+PLATE_SCAN_INTERVAL = 5
+
+# Use the local OCR environment on Windows when available.
+# Otherwise use the current application environment (Streamlit Cloud).
 OCR_PYTHON_CANDIDATES = [
     BASE / "lpr_engine" / ".venv_lpr" / "Scripts" / "python.exe",
     ENGINE_DIR / ".venv_lpr" / "Scripts" / "python.exe",
+    BASE / "lpr_engine" / ".venv_lpr" / "bin" / "python",
+    ENGINE_DIR / ".venv_lpr" / "bin" / "python",
+    Path(sys.executable),
 ]
 
 OCR_PYTHON = next(
     (p for p in OCR_PYTHON_CANDIDATES if p.exists()),
-    OCR_PYTHON_CANDIDATES[0]
+    Path(sys.executable)
 )
-
-WORK_DIR = BASE / "traffic_vision_sessions"
-WORK_DIR.mkdir(exist_ok=True)
-
-st.set_page_config(
-    page_title="YOLOCOP",
-    page_icon="🚦",
-    layout="centered",
-    initial_sidebar_state="collapsed"
-)
-
-for key, default in (
-    ("last_run", None),
-    ("upload_token", None),
-    ("media_path", None),
-    ("img_token", None),
-    ("vid_token", None),
-    ("active_kind", None),
-):
-    if key not in st.session_state:
-        st.session_state[key] = default
 
 # ==========================================================
 # DESIGN  (black + shadow burgundy, grid, 3D, motion)
@@ -435,6 +421,18 @@ def save_crop(image, path, verify=False):
     if verify and cv2.imread(str(path)) is None:
         raise OSError(f"Saved image crop cannot be decoded: {path}")
 
+def download_ocr_weights():
+    try:
+        model_path = hf_hub_download(
+            repo_id=HF_REPO_ID,
+            filename="model.safetensors"
+        )
+        return Path(model_path)
+
+    except Exception as e:
+        raise RuntimeError(
+            f"Unable to download Awiros OCR model from Hugging Face: {e}"
+        )
 
 def extract_detections(result, model):
     detections = []
@@ -835,10 +833,23 @@ def process_video(model, video_path, output_dir, confidence, progress):
     convert_annotated_video(temp_video, output_video)
     return output_video, records, plate_map, frame_number
 
+# ==========================================================
+# AWIROS OCR + HUGGING FACE
+# ==========================================================
 
-# ==========================================================
-# AWIROS OCR
-# ==========================================================
+def download_ocr_weights():
+    try:
+        return Path(
+            hf_hub_download(
+                repo_id=HF_REPO_ID,
+                filename="model.safetensors"
+            )
+        )
+    except Exception as e:
+        raise RuntimeError(
+            f"Hugging Face OCR model download failed: {e}"
+        ) from e
+
 
 def run_awiros_ocr(plate_directory, output_json):
     plate_directory = Path(plate_directory)
@@ -847,24 +858,32 @@ def run_awiros_ocr(plate_directory, output_json):
     if not list(plate_directory.glob("*.jpg")):
         return []
 
-    if not OCR_PYTHON.exists():
-        raise FileNotFoundError(
-            "Awiros Python environment not found. Checked:\n"
-            + "\n".join(str(p) for p in OCR_PYTHON_CANDIDATES)
-        )
+    # Use the active Streamlit Python environment
+    ocr_python = Path(sys.executable)
+
     if not OCR_SCRIPT.exists():
-        raise FileNotFoundError(f"Awiros script not found: {OCR_SCRIPT}")
-    if not OCR_WEIGHTS.exists():
-        raise FileNotFoundError(f"OCR weights not found: {OCR_WEIGHTS}")
+        raise FileNotFoundError(
+            f"Awiros script not found: {OCR_SCRIPT}"
+        )
+
     if not OCR_DICT.exists():
-        raise FileNotFoundError(f"OCR dictionary not found: {OCR_DICT}")
+        raise FileNotFoundError(
+            f"OCR dictionary not found: {OCR_DICT}"
+        )
+
     if not (PADDLEOCR_DIR / "ppocr" / "__init__.py").exists():
-        raise FileNotFoundError(f"PaddleOCR repository not found: {PADDLEOCR_DIR}")
+        raise FileNotFoundError(
+            f"PaddleOCR repository not found: {PADDLEOCR_DIR}"
+        )
+
+    # Download model from Hugging Face
+    ocr_weights = download_ocr_weights()
 
     command = [
-        str(OCR_PYTHON), str(OCR_SCRIPT),
+        str(ocr_python),
+        str(OCR_SCRIPT),
         "--image_path", str(plate_directory),
-        "--weights", str(OCR_WEIGHTS),
+        "--weights", str(ocr_weights),
         "--dict_path", str(OCR_DICT),
         "--device", "cpu",
         "--output_json", str(output_json),
@@ -872,42 +891,49 @@ def run_awiros_ocr(plate_directory, output_json):
     ]
 
     result = subprocess.run(
-        command, cwd=str(ENGINE_DIR), capture_output=True,
-        text=True, encoding="utf-8", errors="replace"
+        command,
+        cwd=str(ENGINE_DIR),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace"
     )
 
     if result.returncode != 0:
         raise RuntimeError(
-            "Awiros OCR failed.\n\n"
-            + result.stdout[-3000:] + "\n" + result.stderr[-5000:]
+            "Awiros OCR failed.\n"
+            + result.stdout[-3000:]
+            + "\n"
+            + result.stderr[-5000:]
         )
 
     if not output_json.exists():
-        raise RuntimeError("Awiros did not create its output JSON.")
+        raise RuntimeError(
+            "Awiros did not create its output JSON."
+        )
 
     with open(output_json, "r", encoding="utf-8") as f:
         results = json.load(f)
-    if not isinstance(results, list):
-        raise ValueError("Awiros output JSON must contain a list of OCR results.")
-    for result in results:
-        if not isinstance(result, dict) or not result.get("image"):
-            raise ValueError("Awiros returned an OCR row without an image filename.")
-        if "confidence" not in result or "prediction" not in result:
-            raise ValueError(
-                f"Awiros returned an incomplete OCR row for {result.get('image')}."
-            )
-        try:
-            confidence = float(result["confidence"])
-        except (TypeError, ValueError) as error:
-            raise ValueError(
-                f"Awiros returned an invalid confidence for {result['image']}."
-            ) from error
-        if not 0 <= confidence <= 1:
-            raise ValueError(
-                f"Awiros confidence for {result['image']} is outside [0, 1]."
-            )
-    return results
 
+    if not isinstance(results, list):
+        raise ValueError("Awiros output JSON must contain a list.")
+
+    for result in results:
+        if not isinstance(result, dict):
+            raise ValueError("Invalid OCR result.")
+
+        if not result.get("image"):
+            raise ValueError("OCR result has no image filename.")
+
+        if "confidence" not in result or "prediction" not in result:
+            raise ValueError("OCR result is incomplete.")
+
+        confidence = float(result["confidence"])
+
+        if not 0 <= confidence <= 1:
+            raise ValueError("OCR confidence is outside [0, 1].")
+
+    return results
 
 # ==========================================================
 # MATCH OCR READINGS TO VEHICLES
