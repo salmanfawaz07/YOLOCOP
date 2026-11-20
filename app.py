@@ -635,21 +635,6 @@ def convert_annotated_video(temp_video, output_video):
         str(output_video),
     ]
     
-    
-    command = [
-    ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
-    "-i", str(temp_video),
-    "-vf", "scale='min(1280,iw)':-2",
-    "-c:v", "libx264",
-    "-preset", "ultrafast",
-    "-crf", "28",
-    "-threads", "1",
-    "-pix_fmt", "yuv420p",
-    "-color_range", "tv",
-    "-movflags", "+faststart",
-    "-an",
-    str(output_video),
-]
     conversion = subprocess.run(
         command,
         capture_output=True,
@@ -1306,13 +1291,15 @@ def run_pipeline(media_path, is_image, confidence, file_name, status_box):
 
     raw_ocr_results, ocr_error = [], None
 
-    if plate_map and is_image:
+    if plate_map:
         status_box.info(
-            f"YOLO complete. {len(plate_map)} plate crops found. Running Awiros OCR..."
+            f"YOLO complete. {len(plate_map)} plate crops found. "
+            "Running Awiros OCR..."
         )
         try:
             raw_ocr_results = run_awiros_ocr(
-                run_dir / "plate_crops", run_dir / "ocr_results.json"
+                run_dir / "plate_crops",
+                run_dir / "ocr_results.json"
             )
         except (
             OSError,
@@ -1321,13 +1308,7 @@ def run_pipeline(media_path, is_image, confidence, file_name, status_box):
             subprocess.SubprocessError,
         ) as error:
             ocr_error = str(error)
-
-    elif plate_map:
-        status_box.warning(
-            f"YOLO complete. {len(plate_map)} plate crops saved. "
-            "Video OCR temporarily skipped for testing."
-
-    )
+            status_box.error(f"Awiros OCR error: {ocr_error}")
 
     else:
         status_box.warning(
