@@ -1748,9 +1748,9 @@ def show_community_comments():
 
         likes = likes_response.data or []
 
-    except Exception as exc:
+    except Exception as e:
         st.error("Unable to load community comments.")
-        print("COMMENTS ERROR:", repr(exc))
+        st.code(str(e))
         return
 
     # LIKE COUNTS
