@@ -1674,10 +1674,6 @@ else:
 # ==========================================================
 # ROAD SAFETY MESSAGE  (centered, end of page)
 # ==========================================================
-if st.user.is_logged_in:
-    st.code(st.user.get("sub", "Not available"))
-st.markdown('<div class="rule"></div>', unsafe_allow_html=True)
-
 st.markdown("""
 <div class="pledge-stage">
   <div class="pledge">
