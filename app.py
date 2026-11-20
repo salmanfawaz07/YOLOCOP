@@ -1702,14 +1702,15 @@ st.markdown(
 )
 
 # ==========================================================
-# YOLOCOP COMMUNITY COMMENTS - GOOGLE SIGN-IN + SUPABASE
+# YOLOCOP COMMUNITY COMMENTS
+# GOOGLE LOGIN + SUPABASE
 # ==========================================================
 
 @st.cache_resource
 def get_comments_db():
     return create_client(
         st.secrets["supabase"]["url"],
-        st.secrets["supabase"]["service_role_key"]
+        st.secrets["supabase"]["secret_key"]
     )
 
 
@@ -1717,12 +1718,95 @@ def show_community_comments():
 
     st.markdown("---")
     st.markdown("## 💬 Community Comments")
-    st.caption("Share your feedback, suggestions and experience with YOLOCOP.")
+    st.caption(
+        "Share your feedback, suggestions and experience with YOLOCOP."
+    )
+
+    logged_in = st.user.is_logged_in
+
+    # GOOGLE LOGIN
+    if not logged_in:
+        st.info("Sign in with Google to write a comment.")
+
+        if st.button(
+            "🔵 Continue with Google",
+            key="yolocop_google_login"
+        ):
+            st.login()
+
+    else:
+        user_name = st.user.get("name", "Google User")
+        user_email = st.user.get("email", "")
+        user_id = st.user.get("sub", "")
+        user_picture = st.user.get("picture", "")
+
+        col1, col2 = st.columns([1, 8])
+
+        with col1:
+            if user_picture:
+                st.image(user_picture, width=45)
+
+        with col2:
+            st.write(f"Commenting as **{user_name}**")
+
+        # COMMENT INPUT FORM
+        with st.form(
+            "yolocop_comment_form",
+            clear_on_submit=True
+        ):
+            comment_text = st.text_area(
+                "Write your comment",
+                placeholder="Share your thoughts about YOLOCOP...",
+                max_chars=2000,
+                height=120
+            )
+
+            submitted = st.form_submit_button(
+                "Publish Comment",
+                use_container_width=True
+            )
+
+            if submitted:
+                comment_text = comment_text.strip()
+
+                if not comment_text:
+                    st.warning("Please write a comment.")
+
+                elif not user_id:
+                    st.error("Google account identity could not be verified.")
+
+                else:
+                    try:
+                        db = get_comments_db()
+
+                        db.table("yolocop_comments").insert({
+                            "google_sub": user_id,
+                            "author_name": user_name,
+                            "author_email": user_email,
+                            "avatar_url": user_picture,
+                            "comment": comment_text
+                        }).execute()
+
+                        st.success("Comment published successfully!")
+                        st.rerun()
+
+                    except Exception as exc:
+                        st.error(
+                            "Unable to publish your comment. "
+                            "Please check the database configuration."
+                        )
+                        print("COMMENT INSERT ERROR:", repr(exc))
+
+        if st.button("Sign out", key="yolocop_google_logout"):
+            st.logout()
+
+    # DISPLAY EXISTING COMMENTS
+    st.markdown("---")
+    st.markdown("### Community Discussion")
 
     try:
         db = get_comments_db()
 
-        # Show comments to everyone, including visitors who are not logged in
         response = (
             db.table("yolocop_comments")
             .select("id, author_name, avatar_url, comment, created_at")
@@ -1735,92 +1819,33 @@ def show_community_comments():
 
         st.markdown(f"### {len(comments)} COMMENTS")
 
-        # Comment submission area
-        if not st.user.is_logged_in:
-
-            st.info("Sign in with Google to write a comment.")
-
-            if st.button("🔵 Continue with Google", key="yolocop_google_login"):
-                st.login()
-
-        else:
-            user_name = st.user.get("name", "Google User")
-            user_email = st.user.get("email", "")
-            user_id = st.user.get("sub", "")
-            user_picture = st.user.get("picture", "")
-
-            st.write(f"👤 Commenting as **{user_name}**")
-
-            with st.form("yolocop_comment_form", clear_on_submit=True):
-
-                comment_text = st.text_area(
-                    "Write a comment...",
-                    placeholder="Share your thoughts about YOLOCOP...",
-                    max_chars=2000,
-                    height=110
-                )
-
-                submitted = st.form_submit_button(
-                    "Publish Comment",
-                    use_container_width=True
-                )
-
-                if submitted:
-                    comment_text = comment_text.strip()
-
-                    if not comment_text:
-                        st.warning("Please write a comment first.")
-
-                    elif not user_id:
-                        st.error("Google account identity could not be verified.")
-
-                    else:
-                        db.table("yolocop_comments").insert({
-                            "google_sub": user_id,
-                            "author_name": user_name,
-                            "author_email": user_email,
-                            "avatar_url": user_picture,
-                            "comment": comment_text
-                        }).execute()
-
-                        st.success("Your comment has been published!")
-                        st.rerun()
-
-            if st.button("Sign out", key="yolocop_google_logout"):
-                st.logout()
-
-        st.markdown("---")
-
-        # Display recent comments
         if not comments:
             st.write("Be the first to comment on YOLOCOP!")
 
         for item in comments:
-
             col1, col2 = st.columns([1, 12])
 
             with col1:
                 if item.get("avatar_url"):
                     st.image(item["avatar_url"], width=42)
                 else:
-                    st.markdown("👤")
+                    st.write("👤")
 
             with col2:
                 st.markdown(f"**{item['author_name']}**")
-
-                created = item.get("created_at", "")
-                if created:
-                    st.caption(created.replace("T", " ")[:16])
-
                 st.write(item["comment"])
+
+                if item.get("created_at"):
+                    st.caption(item["created_at"][:16])
 
             st.markdown("---")
 
-    except Exception:
-        st.error(
-            "Comments are temporarily unavailable. Please try again later."
+    except Exception as exc:
+        st.warning(
+            "Comments database is not connected yet. "
+            "Please check Supabase configuration."
         )
+        print("COMMENT FETCH ERROR:", repr(exc))
 
 
-# Display comments at the bottom of YOLOCOP
 show_community_comments()
