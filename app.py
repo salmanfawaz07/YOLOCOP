@@ -1674,7 +1674,9 @@ else:
 # ==========================================================
 # ROAD SAFETY MESSAGE  (centered, end of page)
 # ==========================================================
-
+if st.user.is_logged_in:
+    st.write("Your Google Account ID:")
+    st.code(st.user.get("sub", "Not available"))
 st.markdown('<div class="rule"></div>', unsafe_allow_html=True)
 
 st.markdown("""
@@ -1702,55 +1704,41 @@ st.markdown(
 )
 
 
-# ==========================================================
-# YOLOCOP COMMUNITY COMMENTS
-# GOOGLE LOGIN + COMMENTS + REPLIES + LIKES
-# ==========================================================
-
-@st.cache_resource
-def get_comments_db():
-    return create_client(
-        st.secrets["supabase"]["url"],
-        st.secrets["supabase"]["secret_key"]
-    )
-
 
 def show_community_comments():
 
     st.markdown("---")
     st.markdown("## 💬 Community Comments")
-    st.caption(
-        "Share your feedback, suggestions and experience with YOLOCOP."
-    )
+    st.caption("Share your feedback, suggestions and experience with YOLOCOP.")
 
-    # GOOGLE LOGIN STATUS
     logged_in = st.user.is_logged_in
 
     if logged_in:
+        user_id = st.user.get("sub", "")
         user_name = st.user.get("name", "Google User")
         user_email = st.user.get("email", "")
-        user_id = st.user.get("sub", "")
         user_picture = st.user.get("picture", "")
     else:
+        user_id = ""
         user_name = ""
         user_email = ""
-        user_id = ""
         user_picture = ""
 
-    # DATABASE CONNECTION AND FETCH
+    creator_id = st.secrets["supabase"].get("creator_google_sub", "")
+    is_creator = bool(logged_in and user_id and user_id == creator_id)
+
     try:
         db = get_comments_db()
 
-        comments_response = (
+        response = (
             db.table("yolocop_comments")
-            .select(
-                "id, parent_id, author_name, avatar_url, "
-                "comment, created_at"
-            )
+            .select("*")
             .order("created_at", desc=True)
             .limit(500)
             .execute()
         )
+
+        comments = response.data or []
 
         likes_response = (
             db.table("yolocop_comment_likes")
@@ -1758,12 +1746,11 @@ def show_community_comments():
             .execute()
         )
 
-        comments = comments_response.data or []
         likes = likes_response.data or []
 
     except Exception as exc:
-        st.error("Unable to connect to the comments database.")
-        print("YOLOCOP DATABASE ERROR:", repr(exc))
+        st.error("Unable to load community comments.")
+        print("COMMENTS ERROR:", repr(exc))
         return
 
     # LIKE COUNTS
@@ -1771,70 +1758,32 @@ def show_community_comments():
     liked_by_user = set()
 
     for like in likes:
-        comment_id = like["comment_id"]
-        like_counts[comment_id] = (
-            like_counts.get(comment_id, 0) + 1
-        )
+        cid = like["comment_id"]
+        like_counts[cid] = like_counts.get(cid, 0) + 1
 
         if logged_in and like["google_sub"] == user_id:
-            liked_by_user.add(comment_id)
+            liked_by_user.add(cid)
 
-    # COMMENT FORM
+    # GOOGLE LOGIN
     if not logged_in:
-
         st.info("Sign in with Google to comment, reply and like.")
 
-        if st.button(
-            "🔵 Continue with Google",
-            key="yolocop_google_login"
-        ):
+        if st.button("🔵 Continue with Google"):
             st.login()
 
     else:
+        st.markdown(f"Commenting as **{user_name}**")
 
-        col1, col2 = st.columns([1, 8])
-
-        with col1:
-            if user_picture:
-                try:
-                    st.image(user_picture, width=45)
-                except Exception:
-                    st.write("👤")
-            else:
-                st.write("👤")
-
-        with col2:
-            st.markdown(f"**{user_name}**")
-            st.caption("Community member")
-
-        with st.form(
-            "yolocop_new_comment_form",
-            clear_on_submit=True
-        ):
-
+        with st.form("new_yolocop_comment", clear_on_submit=True):
             new_comment = st.text_area(
                 "Write a comment",
-                placeholder="Share your thoughts about YOLOCOP...",
-                max_chars=2000,
-                height=100
+                max_chars=2000
             )
 
-            post_comment = st.form_submit_button(
-                "Publish Comment",
-                use_container_width=True
-            )
-
-            if post_comment:
-
+            if st.form_submit_button("Publish Comment"):
                 new_comment = new_comment.strip()
 
-                if not new_comment:
-                    st.warning("Please write a comment.")
-
-                elif not user_id:
-                    st.error("Google account identity could not be verified.")
-
-                else:
+                if new_comment:
                     try:
                         db.table("yolocop_comments").insert({
                             "google_sub": user_id,
@@ -1842,88 +1791,82 @@ def show_community_comments():
                             "author_email": user_email,
                             "avatar_url": user_picture,
                             "comment": new_comment,
-                            "parent_id": None
+                            "parent_id": None,
+                            "is_pinned": False
                         }).execute()
 
                         st.success("Comment published!")
                         st.rerun()
-
                     except Exception as exc:
                         st.error("Unable to publish comment.")
-                        print("COMMENT INSERT ERROR:", repr(exc))
+                        print("INSERT ERROR:", repr(exc))
+                else:
+                    st.warning("Please enter a comment.")
 
-        if st.button("Sign out", key="yolocop_google_logout"):
-            st.logout()
+    # SORT PINNED COMMENTS FIRST
+    parent_comments = [
+        c for c in comments if c.get("parent_id") is None
+    ]
+
+    parent_comments.sort(
+        key=lambda c: (
+            not bool(c.get("is_pinned")),
+            c.get("created_at") or ""
+        )
+    )
+
+    replies_by_parent = {}
+
+    for c in comments:
+        if c.get("parent_id") is not None:
+            replies_by_parent.setdefault(c["parent_id"], []).append(c)
 
     st.markdown("---")
     st.markdown(f"### 💬 {len(comments)} COMMENTS")
 
-    if not comments:
+    if not parent_comments:
         st.info("Be the first to start a discussion!")
 
-    # SEPARATE PARENT COMMENTS AND REPLIES
-    parent_comments = [
-        item for item in comments
-        if item.get("parent_id") is None
-    ]
-
-    replies_by_parent = {}
-
-    for item in comments:
-        parent_id = item.get("parent_id")
-
-        if parent_id is not None:
-            replies_by_parent.setdefault(parent_id, []).append(item)
-
-    # DISPLAY COMMENT AND REPLY THREADS
+    # DISPLAY COMMENTS
     for item in parent_comments:
 
-        comment_id = item["id"]
+        cid = item["id"]
+        owner = logged_in and item.get("google_sub") == user_id
+        pinned = bool(item.get("is_pinned"))
 
         with st.container(border=True):
 
-            col1, col2 = st.columns([1, 12])
+            if pinned:
+                st.markdown("📌 **PINNED BY YOLOCOP CREATOR**")
+
+            col1, col2 = st.columns([1, 10])
 
             with col1:
                 if item.get("avatar_url"):
-                    try:
-                        st.image(item["avatar_url"], width=42)
-                    except Exception:
-                        st.write("👤")
+                    st.image(item["avatar_url"], width=42)
                 else:
                     st.write("👤")
 
             with col2:
                 st.markdown(f"**{item['author_name']}**")
-
-                created = item.get("created_at", "")
-                if created:
-                    st.caption(created.replace("T", " ")[:16])
-
+                st.caption(str(item.get("created_at", ""))[:16])
                 st.write(item["comment"])
 
-            # LIKE AND UNLIKE
+            # LIKE
             if logged_in:
-
-                already_liked = comment_id in liked_by_user
-
-                like_label = (
-                    f"❤️ Unlike ({like_counts.get(comment_id, 0)})"
-                    if already_liked
-                    else f"🤍 Like ({like_counts.get(comment_id, 0)})"
-                )
+                liked = cid in liked_by_user
 
                 if st.button(
-                    like_label,
-                    key=f"like_comment_{comment_id}"
+                    f"{'❤️ Unlike' if liked else '🤍 Like'} "
+                    f"({like_counts.get(cid, 0)})",
+                    key=f"like_{cid}"
                 ):
-
                     try:
-                        if already_liked:
+                        if liked:
                             (
                                 db.table("yolocop_comment_likes")
                                 .delete()
-                                .eq("comment_id", comment_id)
+                                .eq("comment_id", cid)
                                 .eq("google_sub", user_id)
                                 .execute()
                             )
@@ -1931,116 +1874,192 @@ def show_community_comments():
                             (
                                 db.table("yolocop_comment_likes")
                                 .insert({
-                                    "comment_id": comment_id,
+                                    "comment_id": cid,
                                     "google_sub": user_id
                                 })
                                 .execute()
                             )
 
                         st.rerun()
-
                     except Exception as exc:
                         st.error("Unable to update like.")
                         print("LIKE ERROR:", repr(exc))
-
             else:
-                st.caption(
-                    f"🤍 {like_counts.get(comment_id, 0)} Likes"
-                )
+                st.caption(f"🤍 {like_counts.get(cid, 0)} Likes")
+
+            # CREATOR PIN / UNPIN
+            if is_creator:
+                pin_label = "📌 Unpin Comment" if pinned else "📌 Pin Comment"
+
+                if st.button(pin_label, key=f"pin_{cid}"):
+                    try:
+                        db.table("yolocop_comments").update({
+                            "is_pinned": not pinned
+                        }).eq("id", cid).is_("parent_id", "null").execute()
+
+                        st.success(
+                            "Comment unpinned!" if pinned
+                            else "Comment pinned!"
+                        )
+                        st.rerun()
+                    except Exception as exc:
+                        st.error("Unable to update pin.")
+                        print("PIN ERROR:", repr(exc))
+
+            # EDIT OWN COMMENT
+            if owner:
+                with st.expander("✏️ Edit Comment"):
+                    with st.form(f"edit_{cid}"):
+                        edited_text = st.text_area(
+                            "Edit your comment",
+                            value=item["comment"],
+                            max_chars=2000
+                        )
+
+                        if st.form_submit_button("Save Changes"):
+                            edited_text = edited_text.strip()
+
+                            if edited_text:
+                                try:
+                                    (
+                                        db.table("yolocop_comments")
+                                        .update({"comment": edited_text})
+                                        .eq("id", cid)
+                                        .eq("google_sub", user_id)
+                                        .execute()
+                                    )
+                                    st.success("Comment updated!")
+                                    st.rerun()
+                                except Exception as exc:
+                                    st.error("Unable to edit comment.")
+                                    print("EDIT ERROR:", repr(exc))
+                            else:
+                                st.warning("Comment cannot be empty.")
+
+                # DELETE OWN COMMENT
+                if st.button("🗑️ Delete Comment", key=f"delete_{cid}"):
+                    st.session_state[f"confirm_delete_{cid}"] = True
+
+                if st.session_state.get(f"confirm_delete_{cid}", False):
+                    st.warning("Are you sure you want to delete this comment and its replies?")
+
+                    yes_col, no_col = st.columns(2)
+
+                    with yes_col:
+                        if st.button("Yes, Delete", key=f"yes_delete_{cid}"):
+                            try:
+                                (
+                                    db.table("yolocop_comments")
+                                    .delete()
+                                    .eq("id", cid)
+                                    .eq("google_sub", user_id)
+                                    .execute()
+                                )
+                                st.session_state.pop(
+                                    f"confirm_delete_{cid}", None
+                                )
+                                st.success("Comment deleted!")
+                                st.rerun()
+                            except Exception as exc:
+                                st.error("Unable to delete comment.")
+                                print("DELETE ERROR:", repr(exc))
+
+                    with no_col:
+                        if st.button("Cancel", key=f"cancel_delete_{cid}"):
+                            st.session_state.pop(
+                                f"confirm_delete_{cid}", None
+                            )
+                            st.rerun()
 
             # REPLY FORM
             if logged_in:
-
                 with st.expander("↩ Reply"):
-
-                    with st.form(
-                        f"reply_form_{comment_id}",
-                        clear_on_submit=True
-                    ):
-
+                    with st.form(f"reply_{cid}", clear_on_submit=True):
                         reply_text = st.text_area(
                             "Write your reply",
-                            max_chars=2000,
-                            height=80,
-                            key=f"reply_text_{comment_id}"
+                            max_chars=2000
                         )
 
-                        reply_submit = st.form_submit_button(
-                            "Post Reply"
-                        )
-
-                        if reply_submit:
-
+                        if st.form_submit_button("Post Reply"):
                             reply_text = reply_text.strip()
 
-                            if not reply_text:
-                                st.warning("Please enter a reply.")
-
-                            elif not user_id:
-                                st.error("Google identity not verified.")
-
-                            else:
+                            if reply_text:
                                 try:
-                                    db.table(
-                                        "yolocop_comments"
-                                    ).insert({
+                                    db.table("yolocop_comments").insert({
                                         "google_sub": user_id,
                                         "author_name": user_name,
                                         "author_email": user_email,
                                         "avatar_url": user_picture,
                                         "comment": reply_text,
-                                        "parent_id": comment_id
+                                        "parent_id": cid,
+                                        "is_pinned": False
                                     }).execute()
 
                                     st.success("Reply published!")
                                     st.rerun()
-
                                 except Exception as exc:
                                     st.error("Unable to publish reply.")
                                     print("REPLY ERROR:", repr(exc))
 
             # DISPLAY REPLIES
-            replies = replies_by_parent.get(comment_id, [])
+            replies = replies_by_parent.get(cid, [])
 
-            if replies:
+            for reply in sorted(
+                replies,
+                key=lambda r: r.get("created_at") or ""
+            ):
 
-                st.markdown(
-                    f"**↳ {len(replies)} Replies**"
-                )
+                with st.container(border=True):
+                    st.markdown(
+                        f"↳ **{reply['author_name']}**"
+                    )
+                    st.write(reply["comment"])
 
-                for reply in sorted(
-                    replies,
-                    key=lambda x: x.get("created_at") or ""
-                ):
+                    reply_id = reply["id"]
+                    reply_owner = (
+                        logged_in
+                        and reply.get("google_sub") == user_id
+                    )
 
-                    with st.container(border=True):
-
-                        rcol1, rcol2 = st.columns([1, 10])
-
-                        with rcol1:
-                            if reply.get("avatar_url"):
-                                try:
-                                    st.image(
-                                        reply["avatar_url"],
-                                        width=34
-                                    )
-                                except Exception:
-                                    st.write("👤")
-                            else:
-                                st.write("👤")
-
-                        with rcol2:
-                            st.markdown(
-                                f"**{reply['author_name']}**"
-                            )
-
-                            reply_created = reply.get("created_at", "")
-                            if reply_created:
-                                st.caption(
-                                    reply_created.replace("T", " ")[:16]
+                    # EDIT REPLY
+                    if reply_owner:
+                        with st.expander("✏️ Edit Reply"):
+                            with st.form(f"edit_reply_{reply_id}"):
+                                new_text = st.text_area(
+                                    "Edit reply",
+                                    value=reply["comment"],
+                                    max_chars=2000
                                 )
 
-                            st.write(reply["comment"])
+                                if st.form_submit_button("Save Reply"):
+                                    new_text = new_text.strip()
+
+                                    if new_text:
+                                        (
+                                            db.table("yolocop_comments")
+                                            .update({"comment": new_text})
+                                            .eq("id", reply_id)
+                                            .eq("google_sub", user_id)
+                                            .execute()
+                                        )
+                                        st.rerun()
+
+                        if st.button(
+                            "🗑️ Delete Reply",
+                            key=f"delete_reply_{reply_id}"
+                        ):
+                            try:
+                                (
+                                    db.table("yolocop_comments")
+                                    .delete()
+                                    .eq("id", reply_id)
+                                    .eq("google_sub", user_id)
+                                    .execute()
+                                )
+                                st.rerun()
+                            except Exception as exc:
+                                st.error("Unable to delete reply.")
+                                print("REPLY DELETE ERROR:", repr(exc))
 
     st.markdown("---")
 
