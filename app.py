@@ -1701,9 +1701,10 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+
 # ==========================================================
 # YOLOCOP COMMUNITY COMMENTS
-# GOOGLE LOGIN + SUPABASE
+# GOOGLE LOGIN + COMMENTS + REPLIES + LIKES
 # ==========================================================
 
 @st.cache_resource
@@ -1717,16 +1718,71 @@ def get_comments_db():
 def show_community_comments():
 
     st.markdown("---")
-    st.markdown("## 💬 Community Comments")
+    st.markdown("##Comments")
     st.caption(
         "Share your feedback, suggestions and experience with YOLOCOP."
     )
 
+    # GOOGLE LOGIN STATUS
     logged_in = st.user.is_logged_in
 
-    # GOOGLE LOGIN
+    if logged_in:
+        user_name = st.user.get("name", "Google User")
+        user_email = st.user.get("email", "")
+        user_id = st.user.get("sub", "")
+        user_picture = st.user.get("picture", "")
+    else:
+        user_name = ""
+        user_email = ""
+        user_id = ""
+        user_picture = ""
+
+    # DATABASE CONNECTION AND FETCH
+    try:
+        db = get_comments_db()
+
+        comments_response = (
+            db.table("yolocop_comments")
+            .select(
+                "id, parent_id, author_name, avatar_url, "
+                "comment, created_at"
+            )
+            .order("created_at", desc=True)
+            .limit(500)
+            .execute()
+        )
+
+        likes_response = (
+            db.table("yolocop_comment_likes")
+            .select("comment_id, google_sub")
+            .execute()
+        )
+
+        comments = comments_response.data or []
+        likes = likes_response.data or []
+
+    except Exception as exc:
+        st.error("Unable to connect to the comments database.")
+        print("YOLOCOP DATABASE ERROR:", repr(exc))
+        return
+
+    # LIKE COUNTS
+    like_counts = {}
+    liked_by_user = set()
+
+    for like in likes:
+        comment_id = like["comment_id"]
+        like_counts[comment_id] = (
+            like_counts.get(comment_id, 0) + 1
+        )
+
+        if logged_in and like["google_sub"] == user_id:
+            liked_by_user.add(comment_id)
+
+    # COMMENT FORM
     if not logged_in:
-        st.info("Sign in with Google to write a comment.")
+
+        st.info("Sign in with Google to comment, reply and like.")
 
         if st.button(
             "🔵 Continue with Google",
@@ -1735,41 +1791,44 @@ def show_community_comments():
             st.login()
 
     else:
-        user_name = st.user.get("name", "Google User")
-        user_email = st.user.get("email", "")
-        user_id = st.user.get("sub", "")
-        user_picture = st.user.get("picture", "")
 
         col1, col2 = st.columns([1, 8])
 
         with col1:
             if user_picture:
-                st.image(user_picture, width=45)
+                try:
+                    st.image(user_picture, width=45)
+                except Exception:
+                    st.write("👤")
+            else:
+                st.write("👤")
 
         with col2:
-            st.write(f"Commenting as **{user_name}**")
+            st.markdown(f"**{user_name}**")
+            st.caption("Community member")
 
-        # COMMENT INPUT FORM
         with st.form(
-            "yolocop_comment_form",
+            "yolocop_new_comment_form",
             clear_on_submit=True
         ):
-            comment_text = st.text_area(
-                "Write your comment",
+
+            new_comment = st.text_area(
+                "Write a comment",
                 placeholder="Share your thoughts about YOLOCOP...",
                 max_chars=2000,
-                height=120
+                height=100
             )
 
-            submitted = st.form_submit_button(
+            post_comment = st.form_submit_button(
                 "Publish Comment",
                 use_container_width=True
             )
 
-            if submitted:
-                comment_text = comment_text.strip()
+            if post_comment:
 
-                if not comment_text:
+                new_comment = new_comment.strip()
+
+                if not new_comment:
                     st.warning("Please write a comment.")
 
                 elif not user_id:
@@ -1777,75 +1836,213 @@ def show_community_comments():
 
                 else:
                     try:
-                        db = get_comments_db()
-
                         db.table("yolocop_comments").insert({
                             "google_sub": user_id,
                             "author_name": user_name,
                             "author_email": user_email,
                             "avatar_url": user_picture,
-                            "comment": comment_text
+                            "comment": new_comment,
+                            "parent_id": None
                         }).execute()
 
-                        st.success("Comment published successfully!")
+                        st.success("Comment published!")
                         st.rerun()
 
                     except Exception as exc:
-                        st.error(
-                            "Unable to publish your comment. "
-                            "Please check the database configuration."
-                        )
+                        st.error("Unable to publish comment.")
                         print("COMMENT INSERT ERROR:", repr(exc))
 
         if st.button("Sign out", key="yolocop_google_logout"):
             st.logout()
 
-    # DISPLAY EXISTING COMMENTS
     st.markdown("---")
-    st.markdown("### Community Discussion")
+    st.markdown(f"### 💬 {len(comments)} COMMENTS")
 
-    try:
-        db = get_comments_db()
+    if not comments:
+        st.info("Be the first to start a discussion!")
 
-        response = (
-            db.table("yolocop_comments")
-            .select("id, author_name, avatar_url, comment, created_at")
-            .order("created_at", desc=True)
-            .limit(100)
-            .execute()
-        )
+    # SEPARATE PARENT COMMENTS AND REPLIES
+    parent_comments = [
+        item for item in comments
+        if item.get("parent_id") is None
+    ]
 
-        comments = response.data or []
+    replies_by_parent = {}
 
-        st.markdown(f"### {len(comments)} COMMENTS")
+    for item in comments:
+        parent_id = item.get("parent_id")
 
-        if not comments:
-            st.write("Be the first to comment on YOLOCOP!")
+        if parent_id is not None:
+            replies_by_parent.setdefault(parent_id, []).append(item)
 
-        for item in comments:
+    # DISPLAY COMMENT AND REPLY THREADS
+    for item in parent_comments:
+
+        comment_id = item["id"]
+
+        with st.container(border=True):
+
             col1, col2 = st.columns([1, 12])
 
             with col1:
                 if item.get("avatar_url"):
-                    st.image(item["avatar_url"], width=42)
+                    try:
+                        st.image(item["avatar_url"], width=42)
+                    except Exception:
+                        st.write("👤")
                 else:
                     st.write("👤")
 
             with col2:
                 st.markdown(f"**{item['author_name']}**")
+
+                created = item.get("created_at", "")
+                if created:
+                    st.caption(created.replace("T", " ")[:16])
+
                 st.write(item["comment"])
 
-                if item.get("created_at"):
-                    st.caption(item["created_at"][:16])
+            # LIKE AND UNLIKE
+            if logged_in:
 
-            st.markdown("---")
+                already_liked = comment_id in liked_by_user
 
-    except Exception as exc:
-        st.warning(
-            "Comments database is not connected yet. "
-            "Please check Supabase configuration."
-        )
-        print("COMMENT FETCH ERROR:", repr(exc))
+                like_label = (
+                    f"❤️ Unlike ({like_counts.get(comment_id, 0)})"
+                    if already_liked
+                    else f"🤍 Like ({like_counts.get(comment_id, 0)})"
+                )
+
+                if st.button(
+                    like_label,
+                    key=f"like_comment_{comment_id}"
+                ):
+
+                    try:
+                        if already_liked:
+                            (
+                                db.table("yolocop_comment_likes")
+                                .delete()
+                                .eq("comment_id", comment_id)
+                                .eq("google_sub", user_id)
+                                .execute()
+                            )
+                        else:
+                            (
+                                db.table("yolocop_comment_likes")
+                                .insert({
+                                    "comment_id": comment_id,
+                                    "google_sub": user_id
+                                })
+                                .execute()
+                            )
+
+                        st.rerun()
+
+                    except Exception as exc:
+                        st.error("Unable to update like.")
+                        print("LIKE ERROR:", repr(exc))
+
+            else:
+                st.caption(
+                    f"🤍 {like_counts.get(comment_id, 0)} Likes"
+                )
+
+            # REPLY FORM
+            if logged_in:
+
+                with st.expander("↩ Reply"):
+
+                    with st.form(
+                        f"reply_form_{comment_id}",
+                        clear_on_submit=True
+                    ):
+
+                        reply_text = st.text_area(
+                            "Write your reply",
+                            max_chars=2000,
+                            height=80,
+                            key=f"reply_text_{comment_id}"
+                        )
+
+                        reply_submit = st.form_submit_button(
+                            "Post Reply"
+                        )
+
+                        if reply_submit:
+
+                            reply_text = reply_text.strip()
+
+                            if not reply_text:
+                                st.warning("Please enter a reply.")
+
+                            elif not user_id:
+                                st.error("Google identity not verified.")
+
+                            else:
+                                try:
+                                    db.table(
+                                        "yolocop_comments"
+                                    ).insert({
+                                        "google_sub": user_id,
+                                        "author_name": user_name,
+                                        "author_email": user_email,
+                                        "avatar_url": user_picture,
+                                        "comment": reply_text,
+                                        "parent_id": comment_id
+                                    }).execute()
+
+                                    st.success("Reply published!")
+                                    st.rerun()
+
+                                except Exception as exc:
+                                    st.error("Unable to publish reply.")
+                                    print("REPLY ERROR:", repr(exc))
+
+            # DISPLAY REPLIES
+            replies = replies_by_parent.get(comment_id, [])
+
+            if replies:
+
+                st.markdown(
+                    f"**↳ {len(replies)} Replies**"
+                )
+
+                for reply in sorted(
+                    replies,
+                    key=lambda x: x.get("created_at") or ""
+                ):
+
+                    with st.container(border=True):
+
+                        rcol1, rcol2 = st.columns([1, 10])
+
+                        with rcol1:
+                            if reply.get("avatar_url"):
+                                try:
+                                    st.image(
+                                        reply["avatar_url"],
+                                        width=34
+                                    )
+                                except Exception:
+                                    st.write("👤")
+                            else:
+                                st.write("👤")
+
+                        with rcol2:
+                            st.markdown(
+                                f"**{reply['author_name']}**"
+                            )
+
+                            reply_created = reply.get("created_at", "")
+                            if reply_created:
+                                st.caption(
+                                    reply_created.replace("T", " ")[:16]
+                                )
+
+                            st.write(reply["comment"])
+
+    st.markdown("---")
 
 
 show_community_comments()
