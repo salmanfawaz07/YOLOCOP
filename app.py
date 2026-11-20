@@ -1702,7 +1702,13 @@ st.markdown(
     '<div class="footer">🚦 <b>Sadak Suraksha, Jeevan Raksha</b> · Made by Salman</div>',
     unsafe_allow_html=True
 )
+def get_comments_db():
+    from supabase import create_client
 
+    supabase_url = st.secrets["supabase"]["url"]
+    supabase_key = st.secrets["supabase"]["secret_key"]
+
+    return create_client(supabase_url, supabase_key)
 
 
 def show_community_comments():
