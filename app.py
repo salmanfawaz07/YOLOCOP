@@ -13,7 +13,7 @@ from collections import defaultdict, Counter
 from ultralytics import YOLO
 import sys
 import huggingface_hub
-from supabase
+from supabase import create_client
 from datetime import datetime
 # ==========================================================
 # YOLOCOP - AI Traffic Violation Detection System
