@@ -1674,6 +1674,8 @@ else:
 # ==========================================================
 # ROAD SAFETY MESSAGE  (centered, end of page)
 # ==========================================================
+st.markdown('<div class="rule"></div>', unsafe_allow_html=True)
+
 st.markdown("""
 <div class="pledge-stage">
   <div class="pledge">
@@ -1907,7 +1909,7 @@ def show_community_comments():
                         st.error("Unable to update pin.")
                         print("PIN ERROR:", repr(exc))
 
-            # EDIT OWN COMMENT
+            # EDIT OWN COMMENT (creator can edit only their own comments)
             if owner:
                 with st.expander("✏️ Edit Comment"):
                     with st.form(f"edit_{cid}"):
@@ -1937,25 +1939,37 @@ def show_community_comments():
                             else:
                                 st.warning("Comment cannot be empty.")
 
-                # DELETE OWN COMMENT
+            # CREATOR CAN DELETE ANY COMMENT; OTHER USERS CAN DELETE THEIR OWN
+            can_delete_comment = is_creator or owner
+
+            if can_delete_comment:
                 if st.button("🗑️ Delete Comment", key=f"delete_{cid}"):
                     st.session_state[f"confirm_delete_{cid}"] = True
 
                 if st.session_state.get(f"confirm_delete_{cid}", False):
-                    st.warning("Are you sure you want to delete this comment and its replies?")
+                    st.warning(
+                        "Are you sure you want to delete this comment and its replies?"
+                    )
 
                     yes_col, no_col = st.columns(2)
 
                     with yes_col:
                         if st.button("Yes, Delete", key=f"yes_delete_{cid}"):
                             try:
-                                (
+                                delete_query = (
                                     db.table("yolocop_comments")
                                     .delete()
                                     .eq("id", cid)
-                                    .eq("google_sub", user_id)
-                                    .execute()
                                 )
+
+                                # Non-creators may delete only their own comments.
+                                if not is_creator:
+                                    delete_query = delete_query.eq(
+                                        "google_sub", user_id
+                                    )
+
+                                delete_query.execute()
+
                                 st.session_state.pop(
                                     f"confirm_delete_{cid}", None
                                 )
@@ -2022,7 +2036,7 @@ def show_community_comments():
                         and reply.get("google_sub") == user_id
                     )
 
-                    # EDIT REPLY
+                    # EDIT REPLY (only the reply owner can edit)
                     if reply_owner:
                         with st.expander("✏️ Edit Reply"):
                             with st.form(f"edit_reply_{reply_id}"):
@@ -2036,31 +2050,78 @@ def show_community_comments():
                                     new_text = new_text.strip()
 
                                     if new_text:
-                                        (
-                                            db.table("yolocop_comments")
-                                            .update({"comment": new_text})
-                                            .eq("id", reply_id)
-                                            .eq("google_sub", user_id)
-                                            .execute()
-                                        )
-                                        st.rerun()
+                                        try:
+                                            (
+                                                db.table("yolocop_comments")
+                                                .update({"comment": new_text})
+                                                .eq("id", reply_id)
+                                                .eq("google_sub", user_id)
+                                                .execute()
+                                            )
+                                            st.success("Reply updated!")
+                                            st.rerun()
+                                        except Exception as exc:
+                                            st.error("Unable to edit reply.")
+                                            print("REPLY EDIT ERROR:", repr(exc))
+                                    else:
+                                        st.warning("Reply cannot be empty.")
 
+                    # CREATOR CAN DELETE ANY REPLY; OTHER USERS CAN DELETE THEIR OWN
+                    can_delete_reply = is_creator or reply_owner
+
+                    if can_delete_reply:
                         if st.button(
                             "🗑️ Delete Reply",
                             key=f"delete_reply_{reply_id}"
                         ):
-                            try:
-                                (
-                                    db.table("yolocop_comments")
-                                    .delete()
-                                    .eq("id", reply_id)
-                                    .eq("google_sub", user_id)
-                                    .execute()
-                                )
-                                st.rerun()
-                            except Exception as exc:
-                                st.error("Unable to delete reply.")
-                                print("REPLY DELETE ERROR:", repr(exc))
+                            st.session_state[f"confirm_delete_reply_{reply_id}"] = True
+
+                        if st.session_state.get(
+                            f"confirm_delete_reply_{reply_id}", False
+                        ):
+                            st.warning("Are you sure you want to delete this reply?")
+                            reply_yes, reply_no = st.columns(2)
+
+                            with reply_yes:
+                                if st.button(
+                                    "Yes, Delete Reply",
+                                    key=f"yes_delete_reply_{reply_id}"
+                                ):
+                                    try:
+                                        delete_reply_query = (
+                                            db.table("yolocop_comments")
+                                            .delete()
+                                            .eq("id", reply_id)
+                                        )
+
+                                        if not is_creator:
+                                            delete_reply_query = (
+                                                delete_reply_query.eq(
+                                                    "google_sub", user_id
+                                                )
+                                            )
+
+                                        delete_reply_query.execute()
+                                        st.session_state.pop(
+                                            f"confirm_delete_reply_{reply_id}",
+                                            None
+                                        )
+                                        st.success("Reply deleted!")
+                                        st.rerun()
+                                    except Exception as exc:
+                                        st.error("Unable to delete reply.")
+                                        print("REPLY DELETE ERROR:", repr(exc))
+
+                            with reply_no:
+                                if st.button(
+                                    "Cancel",
+                                    key=f"cancel_delete_reply_{reply_id}"
+                                ):
+                                    st.session_state.pop(
+                                        f"confirm_delete_reply_{reply_id}",
+                                        None
+                                    )
+                                    st.rerun()
 
     st.markdown("---")
 
