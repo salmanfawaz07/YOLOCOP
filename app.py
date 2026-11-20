@@ -1718,7 +1718,7 @@ def get_comments_db():
 def show_community_comments():
 
     st.markdown("---")
-    st.markdown("##Comments")
+    st.markdown("## 💬 Community Comments")
     st.caption(
         "Share your feedback, suggestions and experience with YOLOCOP."
     )
