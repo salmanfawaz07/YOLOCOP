@@ -620,16 +620,36 @@ def convert_annotated_video(temp_video, output_video):
         )
     if not temp_video.exists() or temp_video.stat().st_size == 0:
         raise RuntimeError("The annotated AVI is missing or empty; MP4 conversion was not run.")
-
     command = [
         ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
         "-i", str(temp_video),
-        "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
-        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-        "-pix_fmt", "yuv420p", "-color_range", "tv",
-        "-movflags", "+faststart", "-an",
+        "-vf", "scale='min(1280,iw)':-2",
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-crf", "28",
+        "-threads", "1",
+        "-pix_fmt", "yuv420p",
+        "-color_range", "tv",
+        "-movflags", "+faststart",
+        "-an",
         str(output_video),
     ]
+    
+    
+    command = [
+    ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+    "-i", str(temp_video),
+    "-vf", "scale='min(1280,iw)':-2",
+    "-c:v", "libx264",
+    "-preset", "ultrafast",
+    "-crf", "28",
+    "-threads", "1",
+    "-pix_fmt", "yuv420p",
+    "-color_range", "tv",
+    "-movflags", "+faststart",
+    "-an",
+    str(output_video),
+]
     conversion = subprocess.run(
         command,
         capture_output=True,
