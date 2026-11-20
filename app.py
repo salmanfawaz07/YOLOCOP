@@ -1675,7 +1675,6 @@ else:
 # ROAD SAFETY MESSAGE  (centered, end of page)
 # ==========================================================
 if st.user.is_logged_in:
-    st.write("Your Google Account ID:")
     st.code(st.user.get("sub", "Not available"))
 st.markdown('<div class="rule"></div>', unsafe_allow_html=True)
 
