@@ -489,49 +489,72 @@ def detection_passes_threshold(item, confidence, image_shape):
     aspect_ratio = box_width / box_height
     return 1.2 <= aspect_ratio <= 8.0
 
-
 def annotate_detections(frame, detections):
-    """Draw compact, readable labels without changing detection results."""
+    """Draw bold, clean violation-only bounding boxes."""
     annotated = frame.copy()
-    colors = {
-        "bike": (255, 180, 0),
-        "plate": (0, 220, 100),
-        "violation": (40, 70, 245),
-    }
-    height, width = frame.shape[:2]
-    font_scale = max(0.38, min(0.52, width / 2200))
-    thickness = 1 if width < 1100 else 2
-    box_thickness = 2 if width >= 900 else 1
+    height, width = annotated.shape[:2]
 
     for item in detections:
-        x1, y1, x2, y2 = map(int, item["box"])
-        if is_bike(item["class"]):
-            color = colors["bike"]
-        elif is_plate(item["class"]):
-            color = colors["plate"]
-        elif is_violation(item["class"]):
-            color = colors["violation"]
-        else:
-            color = (235, 235, 235)
-        label = f"{item['class']} {item['confidence']:.2f}"
-        if is_bike(item["class"]) and item.get("track_id") is not None:
-            label += f" ID:{item['track_id']}"
+        # Show only trained traffic-violation classes
+        if not is_violation(item["class"]):
+            continue
 
-        cv2.rectangle(annotated, (x1, y1), (x2, y2), color, box_thickness)
+        x1, y1, x2, y2 = map(int, item["box"])
+        confidence = item["confidence"]
+
+        # Keep coordinates within the image
+        x1 = max(0, min(x1, width - 1))
+        y1 = max(0, min(y1, height - 1))
+        x2 = max(0, min(x2, width - 1))
+        y2 = max(0, min(y2, height - 1))
+
+        color = (0, 0, 255)  # Red violation box
+        thickness = max(3, int(width / 450))
+
+        violation = violation_label(item["class"]).upper()
+        label = f"VIOLATION: {violation}  |  CONF: {confidence:.0%}"
+
+        # Thick bounding box
+        cv2.rectangle(
+            annotated,
+            (x1, y1),
+            (x2, y2),
+            color,
+            thickness
+        )
+
+        # Bold label background
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = max(0.55, min(0.85, width / 1500))
+        text_thickness = max(2, thickness - 1)
+
         (text_w, text_h), baseline = cv2.getTextSize(
-            label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness
+            label, font, font_scale, text_thickness
         )
-        label_y = y1 - 5
-        if label_y - text_h - baseline < 0:
-            label_y = min(height - baseline - 2, y1 + text_h + baseline + 5)
-        bg_top = max(0, label_y - text_h - baseline - 3)
-        bg_bottom = min(height - 1, label_y + baseline + 2)
-        bg_right = min(width - 1, x1 + text_w + 6)
-        cv2.rectangle(annotated, (x1, bg_top), (bg_right, bg_bottom), color, -1)
+
+        label_top = max(0, y1 - text_h - baseline - 14)
+        label_bottom = label_top + text_h + baseline + 12
+        label_right = min(width - 1, x1 + text_w + 18)
+
+        cv2.rectangle(
+            annotated,
+            (x1, label_top),
+            (label_right, label_bottom),
+            color,
+            -1
+        )
+
         cv2.putText(
-            annotated, label, (x1 + 3, label_y), cv2.FONT_HERSHEY_SIMPLEX,
-            font_scale, (15, 15, 15), thickness, cv2.LINE_AA
+            annotated,
+            label,
+            (x1 + 9, label_bottom - baseline - 5),
+            font,
+            font_scale,
+            (255, 255, 255),
+            text_thickness,
+            cv2.LINE_AA
         )
+
     return annotated
 
 
