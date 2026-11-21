@@ -489,30 +489,55 @@ def detection_passes_threshold(item, confidence, image_shape):
     aspect_ratio = box_width / box_height
     return 1.2 <= aspect_ratio <= 8.0
 
+
 def annotate_detections(frame, detections):
-    """Draw bold, clean violation-only bounding boxes."""
     annotated = frame.copy()
     height, width = annotated.shape[:2]
 
+    # BGR colours matching the old YOLO annotation style
+    class_styles = {
+        "bike": ("BIKE", (255, 80, 0)),
+        "withouthelmet": ("WITHOUT HELMET", (180, 0, 180)),
+        "nohelmet": ("WITHOUT HELMET", (180, 0, 180)),
+        "numberplate": ("NUMBER PLATE", (255, 200, 0)),
+        "plate": ("NUMBER PLATE", (255, 200, 0)),
+        "helmet": ("HELMET", (0, 180, 0)),
+        "usingphone": ("USING PHONE", (0, 140, 255)),
+        "phone": ("USING PHONE", (0, 140, 255)),
+    }
+
     for item in detections:
-        # Show only trained traffic-violation classes
-        if not is_violation(item["class"]):
+        x1, y1, x2, y2 = map(int, item["box"])
+
+        class_name = str(item["class"]).lower()
+        class_key = (
+            class_name.replace("_", "")
+            .replace("-", "")
+            .replace(" ", "")
+        )
+
+        # Display all five trained classes
+        if class_key not in class_styles:
             continue
 
-        x1, y1, x2, y2 = map(int, item["box"])
+        display_name, color = class_styles[class_key]
         confidence = item["confidence"]
 
-        # Keep coordinates within the image
         x1 = max(0, min(x1, width - 1))
         y1 = max(0, min(y1, height - 1))
         x2 = max(0, min(x2, width - 1))
         y2 = max(0, min(y2, height - 1))
 
-        color = (0, 0, 255)  # Red violation box
-        thickness = max(3, int(width / 450))
+        label = f"{display_name} {confidence:.2f}"
 
-        violation = violation_label(item["class"]).upper()
-        label = f"VIOLATION: {violation}  |  CONF: {confidence:.0%}"
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = max(0.65, min(1.0, width / 1200))
+        thickness = max(2, int(width / 500))
+        box_thickness = max(3, int(width / 450))
+
+        (text_w, text_h), baseline = cv2.getTextSize(
+            label, font, font_scale, thickness
+        )
 
         # Thick bounding box
         cv2.rectangle(
@@ -520,21 +545,13 @@ def annotate_detections(frame, detections):
             (x1, y1),
             (x2, y2),
             color,
-            thickness
+            box_thickness
         )
 
-        # Bold label background
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = max(0.55, min(0.85, width / 1500))
-        text_thickness = max(2, thickness - 1)
-
-        (text_w, text_h), baseline = cv2.getTextSize(
-            label, font, font_scale, text_thickness
-        )
-
-        label_top = max(0, y1 - text_h - baseline - 14)
+        # Filled label background
+        label_top = max(0, y1 - text_h - baseline - 12)
         label_bottom = label_top + text_h + baseline + 12
-        label_right = min(width - 1, x1 + text_w + 18)
+        label_right = min(width - 1, x1 + text_w + 12)
 
         cv2.rectangle(
             annotated,
@@ -544,19 +561,19 @@ def annotate_detections(frame, detections):
             -1
         )
 
+        # Bold white label text
         cv2.putText(
             annotated,
             label,
-            (x1 + 9, label_bottom - baseline - 5),
+            (x1 + 6, label_bottom - baseline - 5),
             font,
             font_scale,
             (255, 255, 255),
-            text_thickness,
+            thickness,
             cv2.LINE_AA
         )
 
     return annotated
-
 
 # ==========================================================
 # IMAGE PROCESSING
