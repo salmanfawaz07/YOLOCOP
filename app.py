@@ -348,27 +348,20 @@ def is_bike(name):
 def is_violation(name):
     value = normalise_class(name)
     return any(term in value for term in [
-        "trippleriding",
-        "tripleriding",
-        "withouthelmet",
-        "usingmobile",
-        "usingphone",
-        "usingcellphone"
-    ])      
+        "trippleriding", "tripleriding", "withouthelmet", "usingmobile"
+    ])
+
 
 def violation_label(name):
     value = normalise_class(name)
-
     if "trippleriding" in value or "tripleriding" in value:
         return "Triple Riding"
-    if "withouthelmet" in value or "nohelmet" in value:
+    if "withouthelmet" in value:
         return "Without Helmet"
-    if any(term in value for term in [
-        "usingmobile", "usingphone", "usingcellphone"
-    ]):
-        return "Using Phone"
-
+    if "usingmobile" in value:
+        return "Using Mobile"
     return str(name)
+
 
 def box_iou(a, b):
     x1, y1 = max(a[0], b[0]), max(a[1], b[1])
@@ -524,11 +517,8 @@ def annotate_detections(frame, detections):
         )
 
         # Display all five trained classes
-    
-        display_name, color = class_styles.get(
-            class_key,
-            (str(item["class"]).upper(), (255, 255, 255))
-        )
+        if class_key not in class_styles:
+            continue
 
         display_name, color = class_styles[class_key]
         confidence = item["confidence"]
@@ -2190,4 +2180,3 @@ YOLOCOP is an AI-powered traffic monitoring system
 using YOLOv8, OpenCV and OCR to detect traffic
 violations, including helmet violations and triple riding.
 """)
-st.write("YOLO MODEL CLASSES:", model.names)
