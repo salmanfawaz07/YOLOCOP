@@ -499,51 +499,62 @@ def detection_passes_threshold(item, confidence, image_shape):
 
 
 
+
 def annotate_detections(frame, detections):
     annotated = frame.copy()
     height, width = annotated.shape[:2]
 
-    # BGR colours matching the old YOLO annotation style
+    # BGR colours for each detection class
     class_styles = {
         "bike": ("BIKE", (255, 80, 0)),
+        "motorbike": ("BIKE", (255, 80, 0)),
+        "motorcycle": ("BIKE", (255, 80, 0)),
+
         "withouthelmet": ("WITHOUT HELMET", (180, 0, 180)),
         "nohelmet": ("WITHOUT HELMET", (180, 0, 180)),
+
         "numberplate": ("NUMBER PLATE", (255, 200, 0)),
         "plate": ("NUMBER PLATE", (255, 200, 0)),
+
         "helmet": ("HELMET", (0, 180, 0)),
+
         "usingphone": ("USING PHONE", (0, 140, 255)),
+        "usingmobile": ("USING PHONE", (0, 140, 255)),
+        "usingcellphone": ("USING PHONE", (0, 140, 255)),
         "phone": ("USING PHONE", (0, 140, 255)),
+
+        "trippleriding": ("TRIPLE RIDING", (0, 0, 255)),
+        "tripleriding": ("TRIPLE RIDING", (0, 0, 255)),
     }
 
     for item in detections:
         x1, y1, x2, y2 = map(int, item["box"])
 
-        class_name = str(item["class"]).lower()
-        class_key = (
-            class_name.replace("_", "")
-            .replace("-", "")
-            .replace(" ", "")
-        )
+        # Normalize class names
+        class_key = normalise_class(item["class"])
 
+        # Safe fallback: never crash for an unlisted class
         display_name, color = class_styles.get(
             class_key,
             (str(item["class"]).upper(), (255, 255, 255))
         )
 
-        display_name, color = class_styles[class_key]
-        confidence = item["confidence"]
+        confidence = float(item["confidence"])
 
         x1 = max(0, min(x1, width - 1))
         y1 = max(0, min(y1, height - 1))
         x2 = max(0, min(x2, width - 1))
         y2 = max(0, min(y2, height - 1))
 
+        if x2 <= x1 or y2 <= y1:
+            continue
+
         label = f"{display_name} {confidence:.2f}"
 
         font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = max(0.65, min(1.0, width / 1200))
-        thickness = max(2, int(width / 500))
-        box_thickness = max(3, int(width / 450))
+        font_scale = max(0.75, min(1.15, width / 1000))
+        thickness = max(2, int(width / 450))
+        box_thickness = max(4, int(width / 350))
 
         (text_w, text_h), baseline = cv2.getTextSize(
             label, font, font_scale, thickness
@@ -558,10 +569,10 @@ def annotate_detections(frame, detections):
             box_thickness
         )
 
-        # Filled label background
-        label_top = max(0, y1 - text_h - baseline - 12)
-        label_bottom = label_top + text_h + baseline + 12
-        label_right = min(width - 1, x1 + text_w + 12)
+        # Filled colour label background
+        label_top = max(0, y1 - text_h - baseline - 14)
+        label_bottom = label_top + text_h + baseline + 14
+        label_right = min(width - 1, x1 + text_w + 16)
 
         cv2.rectangle(
             annotated,
@@ -571,11 +582,11 @@ def annotate_detections(frame, detections):
             -1
         )
 
-        # Bold white label text
+        # Bold white class name and confidence
         cv2.putText(
             annotated,
             label,
-            (x1 + 6, label_bottom - baseline - 5),
+            (x1 + 8, label_bottom - baseline - 5),
             font,
             font_scale,
             (255, 255, 255),
