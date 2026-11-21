@@ -491,49 +491,89 @@ def detection_passes_threshold(item, confidence, image_shape):
 
 
 def annotate_detections(frame, detections):
-    """Draw compact, readable labels without changing detection results."""
     annotated = frame.copy()
-    colors = {
-        "bike": (255, 180, 0),
-        "plate": (0, 220, 100),
-        "violation": (40, 70, 245),
+    height, width = annotated.shape[:2]
+
+    # BGR colours matching the old YOLO annotation style
+    class_styles = {
+        "bike": ("BIKE", (255, 80, 0)),
+        "withouthelmet": ("WITHOUT HELMET", (180, 0, 180)),
+        "nohelmet": ("WITHOUT HELMET", (180, 0, 180)),
+        "numberplate": ("NUMBER PLATE", (255, 200, 0)),
+        "plate": ("NUMBER PLATE", (255, 200, 0)),
+        "helmet": ("HELMET", (0, 180, 0)),
+        "usingphone": ("USING PHONE", (0, 140, 255)),
+        "phone": ("USING PHONE", (0, 140, 255)),
     }
-    height, width = frame.shape[:2]
-    font_scale = max(0.38, min(0.52, width / 2200))
-    thickness = 1 if width < 1100 else 2
-    box_thickness = 2 if width >= 900 else 1
 
     for item in detections:
         x1, y1, x2, y2 = map(int, item["box"])
-        if is_bike(item["class"]):
-            color = colors["bike"]
-        elif is_plate(item["class"]):
-            color = colors["plate"]
-        elif is_violation(item["class"]):
-            color = colors["violation"]
-        else:
-            color = (235, 235, 235)
-        label = f"{item['class']} {item['confidence']:.2f}"
-        if is_bike(item["class"]) and item.get("track_id") is not None:
-            label += f" ID:{item['track_id']}"
 
-        cv2.rectangle(annotated, (x1, y1), (x2, y2), color, box_thickness)
+        class_name = str(item["class"]).lower()
+        class_key = (
+            class_name.replace("_", "")
+            .replace("-", "")
+            .replace(" ", "")
+        )
+
+        # Display all five trained classes
+        if class_key not in class_styles:
+            continue
+
+        display_name, color = class_styles[class_key]
+        confidence = item["confidence"]
+
+        x1 = max(0, min(x1, width - 1))
+        y1 = max(0, min(y1, height - 1))
+        x2 = max(0, min(x2, width - 1))
+        y2 = max(0, min(y2, height - 1))
+
+        label = f"{display_name} {confidence:.2f}"
+
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = max(0.65, min(1.0, width / 1200))
+        thickness = max(2, int(width / 500))
+        box_thickness = max(3, int(width / 450))
+
         (text_w, text_h), baseline = cv2.getTextSize(
-            label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness
+            label, font, font_scale, thickness
         )
-        label_y = y1 - 5
-        if label_y - text_h - baseline < 0:
-            label_y = min(height - baseline - 2, y1 + text_h + baseline + 5)
-        bg_top = max(0, label_y - text_h - baseline - 3)
-        bg_bottom = min(height - 1, label_y + baseline + 2)
-        bg_right = min(width - 1, x1 + text_w + 6)
-        cv2.rectangle(annotated, (x1, bg_top), (bg_right, bg_bottom), color, -1)
-        cv2.putText(
-            annotated, label, (x1 + 3, label_y), cv2.FONT_HERSHEY_SIMPLEX,
-            font_scale, (15, 15, 15), thickness, cv2.LINE_AA
-        )
-    return annotated
 
+        # Thick bounding box
+        cv2.rectangle(
+            annotated,
+            (x1, y1),
+            (x2, y2),
+            color,
+            box_thickness
+        )
+
+        # Filled label background
+        label_top = max(0, y1 - text_h - baseline - 12)
+        label_bottom = label_top + text_h + baseline + 12
+        label_right = min(width - 1, x1 + text_w + 12)
+
+        cv2.rectangle(
+            annotated,
+            (x1, label_top),
+            (label_right, label_bottom),
+            color,
+            -1
+        )
+
+        # Bold white label text
+        cv2.putText(
+            annotated,
+            label,
+            (x1 + 6, label_bottom - baseline - 5),
+            font,
+            font_scale,
+            (255, 255, 255),
+            thickness,
+            cv2.LINE_AA
+        )
+
+    return annotated
 
 # ==========================================================
 # IMAGE PROCESSING
