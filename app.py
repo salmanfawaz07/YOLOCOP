@@ -2127,3 +2127,16 @@ def show_community_comments():
 
 
 show_community_comments()
+st.set_page_config(
+    page_title="YOLOCOP | AI Traffic Violation Detection",
+    page_icon="🚦",
+    layout="wide"
+)
+
+st.header("YOLOCOP – AI Traffic Violation Detection")
+
+st.write("""
+YOLOCOP is an AI-powered traffic monitoring system
+using YOLOv8, OpenCV and OCR to detect traffic
+violations, including helmet violations and triple riding.
+""")
