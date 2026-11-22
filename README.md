@@ -11,10 +11,10 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.14-blue?logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/YOLO-Ultralytics-purple" alt="YOLO">
-  <img src="https://img.shields.io/badge/OpenCV-Computer%20Vision-green?logo=opencv" alt="OpenCV">
+  <img src="https://img.shields.io/badge/OpenCV-Computer%20Vision-orange?logo=opencv" alt="OpenCV">
   <img src="https://img.shields.io/badge/Streamlit-Web%20Application-FF4B4B?logo=streamlit&logoColor=white" alt="Streamlit">
   <img src="https://img.shields.io/badge/PyTorch-Deep%20Learning-ee4c2c?logo=pytorch&logoColor=white" alt="PyTorch">
-  <img src="https://img.shields.io/badge/Project-Under%20Development-orange" alt="Project status">
+  <img src="https://img.shields.io/badge/Project-Under%20Completed-Green" alt="Project status">
 </p>
 
 ---
